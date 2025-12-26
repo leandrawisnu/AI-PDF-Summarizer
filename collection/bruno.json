@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "AI PDF Summarizer",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

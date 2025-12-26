@@ -106,6 +106,8 @@ Use the Bruno collection in the `collection/` directory to test API endpoints:
 - Root endpoint
 - PDF Summarization
 
+**Bruno API Client**: Download and install [Bruno](https://www.usebruno.com/) to run the API tests from the collection.
+
 ## 📁 Project Structure
 
 ```

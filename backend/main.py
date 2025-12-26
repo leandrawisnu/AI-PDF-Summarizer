@@ -20,11 +20,13 @@ else:
     print("Warning: GEMINI_API_KEY not found in environment variables")
 
 
+# Enum for summary style
 class Style(str, Enum):
     SHORT = "short"
     GENERAL = "general"
     DETAILED = "detailed"
     
+# Enum for summary language
 class Language(str, Enum):
     IND = "indonesian"
     ENG = "english"
@@ -242,7 +244,7 @@ def summarize_chunks(chunks: list, style: str, language: str) -> str:
                 {chunk}
                 """,
                 generation_config=genai.types.GenerationConfig(
-                    temperature=0.7,
+                    temperature=0.5,
                     top_k=1,
                     top_p=1,
                     max_output_tokens=1024,
@@ -268,7 +270,7 @@ def summarize_chunks(chunks: list, style: str, language: str) -> str:
             - Follow the requested style and language
             
             Summary style: {style}
-            - short: very brief summary (1–2 sentences)
+            - short: very brief summary of the document content
             - general: moderate-length summary covering main points and function of the document
             - detailed: in-depth summary with key explanations and important details
             
@@ -280,7 +282,7 @@ def summarize_chunks(chunks: list, style: str, language: str) -> str:
             {combined_text}
             """,
             generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
+                temperature=0.5,
                 top_k=1,
                 top_p=1,
                 max_output_tokens=2048,
@@ -313,8 +315,8 @@ def summarize_single_chunk(text: str, style: str, language: str) -> str:
             - Do NOT add information that is not present in the document.
 
             Summary styles:
-            - short: very brief summary (1–2 sentences).
-            - general: moderate-length summary covering main points and function of the document.
+            - short: very brief summary of the section.
+            - general: moderate-length summary covering main points and function of the section.
             - detailed: in-depth summary with key explanations and important details.
 
             Languages:
@@ -329,7 +331,7 @@ def summarize_single_chunk(text: str, style: str, language: str) -> str:
             {text}
             """,
             generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
+                temperature=0.5,
                 top_k=1,
                 top_p=1,
                 max_output_tokens=2048,

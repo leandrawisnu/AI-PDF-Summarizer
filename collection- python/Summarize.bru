@@ -1,0 +1,26 @@
+meta {
+  name: Summarize
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://127.0.0.1:8000/summarize
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  file: @file()
+  style: short
+  language: english
+}
+
+body:file {
+  file: @file(D:\Downloads\Documents\buku_panduan_siswa_siprakerin.pdf) @contentType(application/pdf)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

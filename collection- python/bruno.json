@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "name": "AI PDF Management - Go API Collection",
+  "name": "AI PDF Management - Python API Collection",
   "type": "collection",
   "ignore": [
     "node_modules",

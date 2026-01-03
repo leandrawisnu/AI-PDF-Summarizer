@@ -221,7 +221,7 @@ func main() {
 		return c.Status(200).JSON(response)
 	})
 
-	app.Get("/api/:id/download", func(c *fiber.Ctx) error {
+	app.Get("/pdf/:id/download", func(c *fiber.Ctx) error {
 		var pdf models.PDF
 
 		if err := db.First(&pdf, c.Params("id")).Error; err != nil {

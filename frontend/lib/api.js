@@ -87,7 +87,7 @@ export const pdfApi = {
 
   // Download PDF file
   async downloadPDF(id) {
-    const response = await fetch(`${API_BASE_URL}/api/${id}/download`);
+    const response = await fetch(`${API_BASE_URL}/pdf/${id}/download`);
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Download failed' }));
       throw new Error(error.message || `HTTP error! status: ${response.status}`);

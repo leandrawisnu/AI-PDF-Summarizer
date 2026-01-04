@@ -1,4 +1,4 @@
-![Your Banner Image](https://chatgpt.com/backend-api/estuary/content?id=file_00000000ea4472068adb00a5669f45f0&ts=490973&p=fs&cid=1&sig=40c720786098b56fde28ed0f8e076bc2cfce5beca3d8f8b0f3e056fdd9e2ecc2&v=0)
+![Your Banner Image](https://ibb.co.com/MyGwf7XJ)
 
 # AI PDF Management System
 

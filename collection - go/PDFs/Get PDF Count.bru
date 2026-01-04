@@ -1,17 +1,13 @@
 meta {
-  name: Get Summary by ID
+  name: Get PDF Count
   type: http
-  seq: 3
+  seq: 5
 }
 
 get {
-  url: http://127.0.0.1:8080/summaries/:id
+  url: http://127.0.0.1:8080/pdf/count
   body: none
   auth: inherit
-}
-
-params:path {
-  id: 1
 }
 
 settings {

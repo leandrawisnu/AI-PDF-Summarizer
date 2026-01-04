@@ -250,15 +250,51 @@ GOOGLE_API_KEY=your_gemini_api_key_here
 
 ## 🧪 Testing
 
-API testing collection is available in `collection - go/` directory using Bruno API client.
+### API Testing Collections
 
-Available test cases:
-- Ping endpoint
-- Upload PDF
-- Get all PDFs
-- Get PDF details
-- Generate summary
-- Delete PDF
+This project includes comprehensive API testing collections using [Bruno](https://www.usebruno.com/) - a fast and Git-friendly alternative to Postman.
+
+#### Go Backend API Collection (`collection - go/`)
+Tests for the Go backend (Port 8080):
+- **Ping**: Health check endpoint
+- **Upload PDF**: File upload with validation
+- **Get All PDFs**: List PDFs with pagination and search
+- **Get PDF Details**: Individual PDF information with summaries
+- **Generate Summary**: AI-powered summary generation
+- **Delete PDF**: PDF deletion with cleanup
+
+#### Python Backend API Collection (`collection- python/`)
+Tests for the Python backend (Port 8000):
+- **Health Check**: Service availability check
+- **Root**: Basic endpoint verification
+- **Summarize**: Direct AI summarization service
+
+### Getting Started with Bruno
+
+1. **Download Bruno**: Visit [https://www.usebruno.com/](https://www.usebruno.com/) to download the Bruno API client
+2. **Open Collection**: 
+   - Launch Bruno
+   - Click "Open Collection"
+   - Navigate to either `collection - go/` or `collection- python/` directory
+3. **Configure Environment**: Update base URLs if needed (default: localhost)
+4. **Run Tests**: Execute individual requests or run the entire collection
+
+### Test Environment Setup
+
+Ensure your services are running before testing:
+```bash
+# Start all services
+docker-compose up -d
+
+# Or start individually
+docker-compose up postgres -d
+docker-compose up backend-go -d
+docker-compose up backend-python -d
+```
+
+Default endpoints:
+- Go Backend: `http://localhost:8080`
+- Python Backend: `http://localhost:8000`
 
 ## 📝 Development Notes
 

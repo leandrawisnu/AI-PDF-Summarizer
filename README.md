@@ -1,3 +1,5 @@
+![Your Banner Image](https://chatgpt.com/backend-api/estuary/content?id=file_00000000ea4472068adb00a5669f45f0&ts=490973&p=fs&cid=1&sig=40c720786098b56fde28ed0f8e076bc2cfce5beca3d8f8b0f3e056fdd9e2ecc2&v=0)
+
 # AI PDF Management System
 
 A full-stack application for managing PDF documents with AI-powered summarization capabilities using Google Gemini AI.

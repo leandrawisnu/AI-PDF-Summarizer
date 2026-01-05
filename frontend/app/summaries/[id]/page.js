@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { marked } from 'marked';
 import {
     FileText,
     ArrowLeft,
@@ -24,6 +25,16 @@ export default function SummaryDetailPage() {
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Configure marked options
+    useEffect(() => {
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false
+        });
+    }, []);
 
     useEffect(() => {
         if (params.id) {
@@ -207,6 +218,118 @@ export default function SummaryDetailPage() {
 
     return (
         <div className="min-h-screen bg-[#0A0A0A]">
+            {/* Custom styles for markdown content */}
+            <style jsx>{`
+                .markdown-content h1,
+                .markdown-content h2,
+                .markdown-content h3,
+                .markdown-content h4,
+                .markdown-content h5,
+                .markdown-content h6 {
+                    color: #ffffff;
+                    font-weight: 600;
+                    margin-top: 1.5rem;
+                    margin-bottom: 0.75rem;
+                    line-height: 1.25;
+                }
+                
+                .markdown-content h1 { font-size: 1.875rem; }
+                .markdown-content h2 { font-size: 1.5rem; }
+                .markdown-content h3 { font-size: 1.25rem; }
+                .markdown-content h4 { font-size: 1.125rem; }
+                .markdown-content h5 { font-size: 1rem; }
+                .markdown-content h6 { font-size: 0.875rem; }
+                
+                .markdown-content p {
+                    margin-bottom: 1rem;
+                    line-height: 1.625;
+                }
+                
+                .markdown-content ul,
+                .markdown-content ol {
+                    margin-bottom: 1rem;
+                    padding-left: 1.5rem;
+                }
+                
+                .markdown-content li {
+                    margin-bottom: 0.25rem;
+                }
+                
+                .markdown-content strong {
+                    color: #ffffff;
+                    font-weight: 600;
+                }
+                
+                .markdown-content em {
+                    font-style: italic;
+                }
+                
+                .markdown-content code {
+                    background-color: #1f2937;
+                    color: #f59e0b;
+                    padding: 0.125rem 0.25rem;
+                    border-radius: 0.25rem;
+                    font-size: 0.875rem;
+                    font-family: 'Courier New', monospace;
+                }
+                
+                .markdown-content pre {
+                    background-color: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 0.5rem;
+                    padding: 1rem;
+                    margin-bottom: 1rem;
+                    overflow-x: auto;
+                }
+                
+                .markdown-content pre code {
+                    background-color: transparent;
+                    padding: 0;
+                    color: #d1d5db;
+                }
+                
+                .markdown-content blockquote {
+                    border-left: 4px solid #3b82f6;
+                    padding-left: 1rem;
+                    margin: 1rem 0;
+                    font-style: italic;
+                    color: #9ca3af;
+                }
+                
+                .markdown-content a {
+                    color: #3b82f6;
+                    text-decoration: underline;
+                }
+                
+                .markdown-content a:hover {
+                    color: #2563eb;
+                }
+                
+                .markdown-content hr {
+                    border: none;
+                    border-top: 1px solid #374151;
+                    margin: 2rem 0;
+                }
+                
+                .markdown-content table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 1rem;
+                }
+                
+                .markdown-content th,
+                .markdown-content td {
+                    border: 1px solid #374151;
+                    padding: 0.5rem;
+                    text-align: left;
+                }
+                
+                .markdown-content th {
+                    background-color: #1f2937;
+                    color: #ffffff;
+                    font-weight: 600;
+                }
+            `}</style>
             {/* Header */}
             <header className="border-b border-[#1F2937] backdrop-blur-sm sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-6 py-4">
@@ -325,9 +448,12 @@ export default function SummaryDetailPage() {
                 <div className="border border-[#1F2937] rounded-lg p-6">
                     <h4 className="text-lg font-medium text-white mb-4">Summary Content</h4>
                     <div className="prose prose-invert max-w-none">
-                        <div className="text-[#D1D5DB] leading-relaxed whitespace-pre-wrap font-normal">
-                            {summary.content}
-                        </div>
+                        <div 
+                            className="text-[#D1D5DB] leading-relaxed font-normal markdown-content"
+                            dangerouslySetInnerHTML={{ 
+                                __html: marked.parse(summary.content || '') 
+                            }}
+                        />
                     </div>
                 </div>
             </main>

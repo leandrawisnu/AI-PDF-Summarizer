@@ -221,6 +221,96 @@ func main() {
 		return c.Status(200).JSON(response)
 	})
 
+	app.Get("/pdf/:id/summaries", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		var pdf models.PDF
+
+		// Check if PDF exists
+		if err := db.First(&pdf, id).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return c.Status(404).JSON(fiber.Map{
+					"error":   "not_found",
+					"message": "PDF not found",
+				})
+			}
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "database_error",
+				"message": "Failed to find PDF",
+				"details": err.Error(),
+			})
+		}
+
+		var summaries []models.Summaries
+
+		// Pagination parameters
+		page := c.QueryInt("page", 1)
+		itemsPerPage := c.QueryInt("itemsperpage", 10)
+
+		// Validate pagination parameters
+		if page < 1 {
+			page = 1
+		}
+		if itemsPerPage < 1 || itemsPerPage > 100 {
+			itemsPerPage = 10
+		}
+
+		// Calculate offset from page and itemsPerPage
+		offset := (page - 1) * itemsPerPage
+		limit := itemsPerPage
+
+		// Other query parameters
+		sortBy := c.Query("sort", "created_at")
+		order := c.Query("order", "desc")
+
+		// Validate sort parameters
+		validSortFields := map[string]bool{
+			"created_at":   true,
+			"updated_at":   true,
+			"style":        true,
+			"language":     true,
+			"summary_time": true,
+		}
+		if !validSortFields[sortBy] {
+			sortBy = "created_at"
+		}
+		if order != "asc" && order != "desc" {
+			order = "desc"
+		}
+
+		query := db.Model(&models.Summaries{}).Where("pdf_id = ?", pdf.ID)
+
+		// Get total count for pagination
+		var totalCount int64
+		if err := query.Count(&totalCount).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "database_error",
+				"message": "Failed to count summaries",
+				"details": err.Error(),
+			})
+		}
+
+		// Calculate total pages
+		totalPages := int((totalCount + int64(itemsPerPage) - 1) / int64(itemsPerPage))
+
+		if err := query.Order(fmt.Sprintf("%s %s", sortBy, order)).Limit(limit).Offset(offset).Find(&summaries).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "database_error",
+				"message": "Failed to fetch summaries",
+				"details": err.Error(),
+			})
+		}
+
+		response := dto.SummaryListResponse{
+			Data:         utils.ConvertSummariesToResponse(summaries),
+			Page:         page,
+			ItemsPerPage: itemsPerPage,
+			TotalPages:   totalPages,
+			TotalItems:   totalCount,
+		}
+
+		return c.Status(200).JSON(response)
+	})
+
 	app.Get("/pdf/:id/download", func(c *fiber.Ctx) error {
 		var pdf models.PDF
 

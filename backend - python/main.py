@@ -245,7 +245,7 @@ def summarize_chunks(chunks: list, style: str, language: str) -> str:
                 {chunk}
                 """,
                 generation_config=genai.types.GenerationConfig(
-                    temperature=0.5,
+                    temperature=0.3,
                     top_k=1,
                     top_p=1,
                     max_output_tokens=1024,

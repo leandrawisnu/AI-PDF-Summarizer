@@ -3,6 +3,7 @@ package main
 import (
 	"backend-go/models"
 	"os"
+	"path/filepath"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -46,6 +47,30 @@ func main() {
 		println("Warning: Could not create/update foreign key constraint: " + err.Error())
 	} else {
 		println("Foreign key constraint created successfully!")
+	}
+
+	// Read and execute the update_latest_summary function from SQL file
+	functionSQL, err := os.ReadFile(filepath.Join("sql", "functions", "update_latest_summary.sql"))
+	if err != nil {
+		println("Warning: Could not read function SQL file: " + err.Error())
+	} else if err := db.Exec(string(functionSQL)).Error; err != nil {
+		println("Warning: Could not create update_latest_summary function: " + err.Error())
+	} else {
+		println("Function update_latest_summary created successfully!")
+	}
+
+	// Read and execute the trigger from SQL file (drop first if exists)
+	if err := db.Exec(`DROP TRIGGER IF EXISTS trg_update_latest_summary ON summaries;`).Error; err != nil {
+		println("Warning: Could not drop existing trigger: " + err.Error())
+	}
+
+	triggerSQL, err := os.ReadFile(filepath.Join("sql", "triggers", "trg_update_latest_summary.sql"))
+	if err != nil {
+		println("Warning: Could not read trigger SQL file: " + err.Error())
+	} else if err := db.Exec(string(triggerSQL)).Error; err != nil {
+		println("Warning: Could not create trigger trg_update_latest_summary: " + err.Error())
+	} else {
+		println("Trigger trg_update_latest_summary created successfully!")
 	}
 
 	println("Migration completed successfully!")

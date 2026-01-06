@@ -7,7 +7,7 @@ import (
 
 // ConvertPDFToResponse converts PDF model to PDFResponse DTO
 func ConvertPDFToResponse(pdf models.PDF) dto.PDFResponse {
-	return dto.PDFResponse{
+	response := dto.PDFResponse{
 		ID:        pdf.ID,
 		Filename:  pdf.Filename,
 		FileSize:  pdf.FileSize,
@@ -17,6 +17,15 @@ func ConvertPDFToResponse(pdf models.PDF) dto.PDFResponse {
 		UpdatedAt: pdf.UpdatedAt,
 		Summaries: ConvertSummariesToResponse(pdf.Summaries),
 	}
+
+	// Use fields directly from PDF model
+	response.SummaryVersion = pdf.SummaryVersion
+	response.Summary = pdf.Summary
+	response.Style = pdf.Style
+	response.Language = pdf.Language
+	response.SummaryTime = pdf.SummaryTime
+
+	return response
 }
 
 // ConvertPDFsToResponse converts slice of PDF models to slice of PDFResponse DTOs

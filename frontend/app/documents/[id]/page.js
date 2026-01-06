@@ -6,18 +6,16 @@ import {
   FileText, 
   ArrowLeft,
   Download,
-  Eye,
   Trash2,
   FileCheck,
   Clock,
   Calendar,
   FileIcon,
-  Users,
-  MoreVertical,
-  Plus
+  Users
 } from 'lucide-react';
 import { pdfApi, formatFileSize, formatDate } from '../../../lib/api';
 import SummaryModal from '../../../components/SummaryModal';
+import SummaryHistoryModal from '../../../components/SummaryHistoryModal';
 
 export default function DocumentDetailPage() {
   const params = useParams();
@@ -26,6 +24,7 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [summaryHistoryModalOpen, setSummaryHistoryModalOpen] = useState(false);
 
   const fetchDocument = async () => {
     try {
@@ -44,9 +43,17 @@ export default function DocumentDetailPage() {
         uploadedAt: response.created_at,
         updatedAt: response.updated_at,
         summaries: response.summaries || [],
+        summary_version: response.summary_version || 0,
+        latest_summary: response.summary_version > 0 ? {
+          content: response.summary,
+          style: response.style,
+          language: response.language,
+          summary_time: response.summary_time,
+        } : null,
       };
       
       setDocument(transformedDoc);
+      console.log(transformedDoc)
     } catch (err) {
       setError(err.message);
       console.error('Document fetch error:', err);
@@ -109,6 +116,10 @@ export default function DocumentDetailPage() {
   const handleSummaryGenerated = () => {
     fetchDocument(); // Refresh to get updated summaries
     alert('Summary generated successfully!');
+  };
+
+  const handleOpenSummaryHistory = () => {
+    setSummaryHistoryModalOpen(true);
   };
 
   if (loading) {
@@ -285,68 +296,41 @@ export default function DocumentDetailPage() {
               </div>
             </div>
 
-            {/* Summaries */}
-            <div className="border border-[#1F2937] rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-medium text-white">AI Summaries</h3>
-                <button 
-                  onClick={handleGenerateSummary}
-                  className="border border-[#10B981] text-[#10B981] px-4 py-2 rounded font-normal transition-all duration-200 hover:border-[#059669] hover:text-[#059669] hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4 stroke-1.5" />
-                  Generate Summary
-                </button>
-              </div>
-              
-              {doc.summaries.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 border border-[#1F2937] rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FileCheck className="w-6 h-6 text-[#9CA3AF] stroke-1.5" />
+            {/* Latest Summary */}
+            {doc.summary_version !== 0 && doc.latest_summary && (
+              <div className="border border-[#10B981] rounded-lg p-6 bg-gradient-to-br from-[#10B981]/5 to-transparent">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 border border-[#10B981] rounded flex items-center justify-center">
+                    <FileCheck className="w-4 h-4 text-[#10B981] stroke-1.5" />
                   </div>
-                  <h4 className="text-lg font-medium text-white mb-2">No Summaries Yet</h4>
-                  <p className="text-[#D1D5DB] font-normal mb-4">Generate AI summaries to better understand this document.</p>
-                  <button 
-                    onClick={handleGenerateSummary}
-                    className="border border-[#10B981] text-[#10B981] px-6 py-3 rounded font-normal transition-all duration-200 hover:border-[#059669] hover:text-[#059669] hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center gap-2 mx-auto"
-                  >
-                    <Plus className="w-4 h-4 stroke-1.5" />
-                    Generate First Summary
-                  </button>
+                  <h3 className="text-lg font-medium text-white">Latest Summary</h3>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {doc.summaries.map((summary) => (
-                    <div key={summary.id} className="border border-[#1F2937] rounded-lg p-4 hover:border-[#374151] transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 border border-[#10B981] rounded flex items-center justify-center">
-                            <FileCheck className="w-4 h-4 text-[#10B981] stroke-1.5" />
-                          </div>
-                          <div>
-                            <h4 className="text-white font-medium capitalize">{summary.style} Summary</h4>
-                            <p className="text-sm text-[#9CA3AF]">{summary.language} • {formatDate(summary.created_at)}</p>
-                          </div>
-                        </div>
-                        <button className="text-[#9CA3AF] hover:text-white transition-colors">
-                          <MoreVertical className="w-4 h-4 stroke-1.5" />
-                        </button>
-                      </div>
-                      <p className="text-[#D1D5DB] font-normal leading-relaxed line-clamp-3">
-                        {summary.content}
-                      </p>
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#1F2937]">
-                        <span className="text-xs text-[#9CA3AF]">
-                          Processing time: {summary.summary_time?.toFixed(2) || 'N/A'}s
-                        </span>
-                        <a href={`/summaries/${summary.id}`} className="text-[#3B82F6] hover:text-[#2563EB] text-sm font-normal transition-colors">
-                          View Full Summary
-                        </a>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-[#9CA3AF]">
+                      {doc.latest_summary.style} • {doc.latest_summary.language}
+                    </span>
+                    <span className="text-xs text-[#10B981]">v{doc.summary_version}</span>
+                  </div>
+                  <p className="text-[#D1D5DB] font-normal leading-relaxed line-clamp-4">
+                    {doc.latest_summary.content}
+                  </p>
+                  <div className="flex items-center justify-between pt-3 border-t border-[#1F2937]">
+                    <span className="text-xs text-[#9CA3AF]">
+                      {formatDate(doc.updatedAt)}
+                    </span>
+                    <button 
+                      onClick={handleOpenSummaryHistory}
+                      className="text-[#10B981] hover:text-[#059669] text-sm font-normal transition-colors"
+                    >
+                      View History →
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+
           </div>
 
           {/* Sidebar */}
@@ -370,6 +354,13 @@ export default function DocumentDetailPage() {
                   Generate Summary
                 </button>
                 <button 
+                  onClick={handleOpenSummaryHistory}
+                  className="w-full border border-[#1F2937] text-[#D1D5DB] py-3 px-4 rounded hover:border-[#3B82F6] hover:text-[#3B82F6] transition-all duration-200 flex items-center gap-3"
+                >
+                  <Clock className="w-4 h-4 stroke-1.5" />
+                  Summary History
+                </button>
+                <button 
                   onClick={handleDelete}
                   className="w-full border border-[#1F2937] text-[#D1D5DB] py-3 px-4 rounded hover:border-[#EF4444] hover:text-[#EF4444] transition-all duration-200 flex items-center gap-3"
                 >
@@ -378,8 +369,6 @@ export default function DocumentDetailPage() {
                 </button>
               </div>
             </div>
-
-            {/* Quick Stats */}
             <div className="border border-[#1F2937] rounded-lg p-6">
               <h3 className="text-lg font-medium text-white mb-4">Quick Stats</h3>
               <div className="space-y-3">
@@ -423,6 +412,13 @@ export default function DocumentDetailPage() {
         onClose={() => setSummaryModalOpen(false)}
         document={doc}
         onSummaryGenerated={handleSummaryGenerated}
+      />
+
+      {/* Summary History Modal */}
+      <SummaryHistoryModal
+        isOpen={summaryHistoryModalOpen}
+        onClose={() => setSummaryHistoryModalOpen(false)}
+        pdfId={params.id}
       />
     </div>
   );

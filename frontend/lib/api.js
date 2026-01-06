@@ -94,6 +94,20 @@ export const pdfApi = {
     }
     return response;
   },
+
+  // Get summaries for a specific PDF
+  async getPDFSummaries(id, params = {}) {
+    const searchParams = new URLSearchParams({
+      page: params.page || 1,
+      itemsperpage: params.itemsPerPage || 10,
+      sort: params.sortBy || 'created_at',
+      order: params.order || 'desc',
+      ...(params.search && { search: params.search }),
+    });
+
+    const response = await fetch(`${API_BASE_URL}/pdf/${id}/summaries?${searchParams}`);
+    return handleResponse(response);
+  },
 };
 
 // Summary API functions

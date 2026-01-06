@@ -1,0 +1,27 @@
+meta {
+  name: Get PDF Summaries
+  type: http
+  seq: 10
+}
+
+get {
+  url: http://127.0.0.1:8080/pdf/:id/summaries?page=1&itemsperpage=10&order=desc&sort=created_at
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+params:query {
+  page: 1
+  itemsperpage: 10
+  order: desc
+  sort: created_at
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

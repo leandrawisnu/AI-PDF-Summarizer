@@ -10,14 +10,19 @@ type PDFCreateRequest struct {
 }
 
 type PDFResponse struct {
-	ID        uint              `json:"id"`
-	Filename  string            `json:"filename"`
-	FileSize  int64             `json:"file_size"`
-	Title     string            `json:"title"`
-	PageCount int               `json:"page_count"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	Summaries []SummaryResponse `json:"summaries"`
+	ID             uint              `json:"id"`
+	Filename       string            `json:"filename"`
+	FileSize       int64             `json:"file_size"`
+	Title          string            `json:"title"`
+	PageCount      int               `json:"page_count"`
+	Summary        string            `json:"summary"`
+	Style          string            `json:"style"`
+	Language       string            `json:"language"`
+	SummaryTime    float64           `json:"summary_time"`
+	SummaryVersion int               `json:"summary_version"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
+	Summaries      []SummaryResponse `json:"summaries"`
 }
 
 type PDFListResponse struct {

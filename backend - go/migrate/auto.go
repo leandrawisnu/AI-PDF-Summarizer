@@ -3,7 +3,6 @@ package main
 import (
 	"backend-go/models"
 	"os"
-	"path/filepath"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -50,13 +49,24 @@ func main() {
 	}
 
 	// Read and execute the update_latest_summary function from SQL file
-	functionSQL, err := os.ReadFile(filepath.Join("sql", "functions", "update_latest_summary.sql"))
-	if err != nil {
-		println("Warning: Could not read function SQL file: " + err.Error())
-	} else if err := db.Exec(string(functionSQL)).Error; err != nil {
+	if err := db.Exec(`
+	CREATE OR REPLACE FUNCTION update_latest_summary()
+	RETURNS TRIGGER AS $$
+	BEGIN
+		UPDATE pdfs
+		SET
+			summary = NEW.content,
+			style = NEW.style,
+			language = NEW.language,
+			summary_time = NEW.summary_time,
+			summary_version = COALESCE(summary_version, 0) + 1,
+			updated_at = NOW()
+		WHERE id = NEW.pdf_id;
+
+		RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;`).Error; err != nil {
 		println("Warning: Could not create update_latest_summary function: " + err.Error())
-	} else {
-		println("Function update_latest_summary created successfully!")
 	}
 
 	// Read and execute the trigger from SQL file (drop first if exists)
@@ -64,13 +74,12 @@ func main() {
 		println("Warning: Could not drop existing trigger: " + err.Error())
 	}
 
-	triggerSQL, err := os.ReadFile(filepath.Join("sql", "triggers", "trg_update_latest_summary.sql"))
-	if err != nil {
-		println("Warning: Could not read trigger SQL file: " + err.Error())
-	} else if err := db.Exec(string(triggerSQL)).Error; err != nil {
+	if err := db.Exec(`
+	CREATE TRIGGER trg_update_latest_summary
+	AFTER INSERT ON summaries
+	FOR EACH ROW
+	EXECUTE FUNCTION update_latest_summary();`).Error; err != nil {
 		println("Warning: Could not create trigger trg_update_latest_summary: " + err.Error())
-	} else {
-		println("Trigger trg_update_latest_summary created successfully!")
 	}
 
 	println("Migration completed successfully!")

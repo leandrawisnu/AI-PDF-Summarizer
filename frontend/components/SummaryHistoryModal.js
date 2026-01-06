@@ -12,8 +12,6 @@ export default function SummaryHistoryModal({ isOpen, onClose, pdfId }) {
   const [itemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('created_at');
   const [order, setOrder] = useState('desc');
 
   useEffect(() => {
@@ -34,7 +32,7 @@ export default function SummaryHistoryModal({ isOpen, onClose, pdfId }) {
       setPage(1);
       fetchSummaries(1);
     }
-  }, [sortBy, order]);
+  }, [order]);
 
   const fetchSummaries = async (pageNum = 1) => {
     try {
@@ -43,9 +41,7 @@ export default function SummaryHistoryModal({ isOpen, onClose, pdfId }) {
       const response = await pdfApi.getPDFSummaries(pdfId, {
         page: pageNum,
         itemsPerPage,
-        sortBy,
         order,
-        search: searchQuery,
       });
       setSummaries(response.data || []);
       setTotalPages(response.totalPages || 1);

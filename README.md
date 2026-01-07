@@ -4,16 +4,18 @@ A full-stack application for managing PDF documents with AI-powered summarizatio
 
 ## 🏗️ Architecture
 
-This project consists of three main components:
+This project consists of four main components:
 
 - **Frontend**: Next.js application for user interface
 - **Backend (Go)**: Go/Fiber API for PDF management and database operations
 - **Backend (Python)**: FastAPI service for AI-powered PDF summarization
 - **Database**: PostgreSQL for data persistence
+- **Storage**: MinIO object storage for PDF files (S3-compatible)
 
 ## 🚀 Features
 
 - **PDF Upload & Management**: Upload, store, and manage PDF documents
+- **MinIO Object Storage**: S3-compatible storage for scalable file management
 - **AI Summarization**: Generate summaries using Google Gemini AI with multiple styles and languages
 - **Multi-language Support**: Indonesian and English summarization
 - **Summary Styles**: Short, General, and Detailed summaries
@@ -30,9 +32,8 @@ AI PDF Management/
 ├── backend - go/            # Go backend (PDF management)
 │   ├── dto/                 # Data Transfer Objects
 │   ├── models/              # Database models
-│   ├── utils/               # Utility functions
-│   ├── migrate/             # Database migration
-│   └── uploads/             # PDF file storage
+│   ├── utils/               # Utility functions (including MinIO)
+│   └── migrate/             # Database migration
 ├── backend - python/        # Python backend (AI summarization)
 ├── collection - go/         # Bruno API collection for testing
 ├── postgres/                # PostgreSQL configuration
@@ -50,6 +51,7 @@ AI PDF Management/
 - **Fiber v2**: Web framework
 - **GORM**: ORM for database operations
 - **PostgreSQL**: Database driver
+- **MinIO Go SDK**: Object storage client
 - **UUID**: Unique identifier generation
 
 ### Backend (Python)
@@ -60,6 +62,7 @@ AI PDF Management/
 
 ### Database
 - **PostgreSQL 15**: Primary database
+- **MinIO**: S3-compatible object storage
 - **Adminer**: Database administration tool
 
 ## 🚦 Getting Started
@@ -99,7 +102,21 @@ You have two options for PostgreSQL:
    # Edit .env and add your Google Gemini API key
    ```
 
-3. **Run with Docker Compose**
+3. **MinIO Storage Setup**
+   
+   MinIO is automatically configured in docker-compose.yml and includes automatic fallback to local storage if MinIO is unavailable.
+   
+   - **With MinIO** (Recommended): Files stored in MinIO object storage
+   - **Without MinIO**: Automatic fallback to local `uploads/` directory
+   
+   See [MINIO_SETUP.md](MINIO_SETUP.md) for detailed information and [STORAGE_FALLBACK.md](STORAGE_FALLBACK.md) for fallback behavior.
+   
+   Default MinIO credentials:
+   - Access Key: `minioadmin`
+   - Secret Key: `minioadmin`
+   - Console: http://localhost:9001
+
+4. **Run with Docker Compose**
    ```bash
    # Option A: With included PostgreSQL
    docker-compose up -d
@@ -309,9 +326,10 @@ Default endpoints:
 
 ### File Upload
 - Supported format: PDF only
-- Files stored in `backend - go/uploads/` directory
+- Files stored in MinIO object storage (S3-compatible)
 - Automatic UUID-based filename generation
 - Page count extraction using npdfpages
+- See [MINIO_SETUP.md](MINIO_SETUP.md) for storage configuration
 
 ## 🚀 Deployment
 
@@ -344,6 +362,8 @@ Services will be available at:
 - Frontend: http://localhost:3000
 - Go API: http://localhost:8080
 - Python API: http://localhost:8000
+- MinIO Console: http://localhost:9001
+- MinIO API: http://localhost:9000
 
 ### Database Connection Details
 **Default configuration (included PostgreSQL):**

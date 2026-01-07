@@ -41,9 +41,6 @@ COPY --from=builder /app/migrate/migrate .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# Create uploads directory
-RUN mkdir -p uploads
-
 # Expose port
 EXPOSE 8080
 

@@ -34,6 +34,14 @@ func main() {
 		panic("failed to connect database")
 	}
 
+	// Initialize MinIO
+	if err := utils.InitMinIO(); err != nil {
+		fmt.Printf("Warning: Failed to initialize MinIO: %v\n", err)
+		fmt.Println("Continuing without MinIO support...")
+	} else {
+		fmt.Println("MinIO initialized successfully")
+	}
+
 	app := fiber.New(fiber.Config{
 		ErrorHandler: utils.ErrorHandler,
 	})
@@ -45,7 +53,17 @@ func main() {
 		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
 		AllowCredentials: true,
 	}))
-	app.Use(utils.LoggingMiddleware())
+
+	// Enhanced logging middleware with database support
+	app.Use(utils.NewLoggingMiddleware(utils.LoggingConfig{
+		DB:                db,
+		EnableDBLogging:   true, // Database logging enabled
+		LogRequestBody:    true,
+		LogResponseBody:   false, // Set to true if you want to log response bodies (increases DB size)
+		MaxBodySize:       10000, // 10KB
+		SensitivePatterns: []string{`"password"\s*:\s*"[^"]*"`, `"api_key"\s*:\s*"[^"]*"`},
+	}))
+
 	app.Use(utils.RateLimitMiddleware())
 
 	app.Get("/ping", func(c *fiber.Ctx) error {
@@ -321,21 +339,43 @@ func main() {
 			})
 		}
 
-		filePath := filepath.Join("uploads", pdf.Filename)
+		// Check if MinIO is available
+		if utils.IsMinIOAvailable() {
+			// Download from MinIO
+			object, err := utils.DownloadFromMinIO(pdf.Filename)
+			if err != nil {
+				return c.Status(404).JSON(fiber.Map{
+					"error":   "file_not_found",
+					"message": "PDF file not found in storage",
+					"details": err.Error(),
+				})
+			}
+			defer object.Close()
 
-		// Check if file exists
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			return c.Status(404).JSON(fiber.Map{
-				"error":   "file_not_found",
-				"message": "PDF file not found on server",
-			})
+			// Set appropriate headers for file download
+			c.Set("Content-Type", "application/pdf")
+			c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", pdf.Title+".pdf"))
+
+			// Stream the file
+			return c.SendStream(object)
+		} else {
+			// Fallback to local storage
+			filePath := filepath.Join("uploads", pdf.Filename)
+
+			// Check if file exists
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+				return c.Status(404).JSON(fiber.Map{
+					"error":   "file_not_found",
+					"message": "PDF file not found on server",
+				})
+			}
+
+			// Set appropriate headers for file download
+			c.Set("Content-Type", "application/pdf")
+			c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", pdf.Title+".pdf"))
+
+			return c.SendFile(filePath)
 		}
-
-		// Set appropriate headers for file download
-		c.Set("Content-Type", "application/pdf")
-		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", pdf.Title+".pdf"))
-
-		return c.SendFile(filePath)
 	})
 
 	app.Delete("/pdf/:id", func(c *fiber.Ctx) error {
@@ -351,17 +391,21 @@ func main() {
 			})
 		}
 
-		filePath := filepath.Join("uploads", pdf.Filename)
-		if _, err := os.Stat(filePath); err == nil {
-			if err := os.Remove(filePath); err != nil {
-				return c.Status(500).JSON(fiber.Map{
-					"message": "Failed to delete file",
-				})
+		// Delete from storage
+		if utils.IsMinIOAvailable() {
+			// Delete from MinIO
+			if err := utils.DeleteFromMinIO(pdf.Filename); err != nil {
+				fmt.Printf("Warning: Failed to delete file from MinIO: %v\n", err)
+				// Continue with database deletion even if MinIO deletion fails
 			}
-		} else if !os.IsNotExist(err) {
-			return c.Status(500).JSON(fiber.Map{
-				"message": "Failed to check file existence",
-			})
+		} else {
+			// Delete from local storage
+			filePath := filepath.Join("uploads", pdf.Filename)
+			if _, err := os.Stat(filePath); err == nil {
+				if err := os.Remove(filePath); err != nil {
+					fmt.Printf("Warning: Failed to delete local file: %v\n", err)
+				}
+			}
 		}
 
 		db.Unscoped().Delete(&pdf)
@@ -411,34 +455,108 @@ func main() {
 			})
 		}
 
-		if err := os.MkdirAll("./uploads", os.ModePerm); err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "server_error",
-				"message": "Failed to create upload directory",
-				"details": err.Error(),
-			})
-		}
-
+		// Generate unique filename
 		ext := filepath.Ext(file.Filename)
 		filename := uuid.New().String() + ext
 
-		if err := c.SaveFile(file, "./uploads/"+filename); err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "server_error",
-				"message": "Failed to save file",
-				"details": err.Error(),
-			})
-		}
+		var pageCount int
 
-		// Get page count
-		pageCount := npdfpages.PagesAtPath(filepath.Join("uploads", filename))
-		if pageCount <= 0 {
-			// Clean up the uploaded file if it's invalid
-			os.Remove(filepath.Join("uploads", filename))
-			return c.Status(400).JSON(fiber.Map{
-				"error":   "invalid_file",
-				"message": "Invalid PDF file or unable to read page count",
-			})
+		// Check if MinIO is available
+		if utils.IsMinIOAvailable() {
+			// Use MinIO storage
+			fileReader, err := file.Open()
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "server_error",
+					"message": "Failed to open uploaded file",
+					"details": err.Error(),
+				})
+			}
+			defer fileReader.Close()
+
+			// Upload to MinIO
+			if err := utils.UploadToMinIO(filename, fileReader, file.Size, "application/pdf"); err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "storage_error",
+					"message": "Failed to upload file to storage",
+					"details": err.Error(),
+				})
+			}
+
+			// Download from MinIO to get page count (temporary)
+			object, err := utils.DownloadFromMinIO(filename)
+			if err != nil {
+				utils.DeleteFromMinIO(filename)
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "storage_error",
+					"message": "Failed to retrieve file from storage",
+					"details": err.Error(),
+				})
+			}
+			defer object.Close()
+
+			// Save to temporary file for page count
+			tempFile, err := os.CreateTemp("", "pdf-*.pdf")
+			if err != nil {
+				utils.DeleteFromMinIO(filename)
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "server_error",
+					"message": "Failed to create temporary file",
+					"details": err.Error(),
+				})
+			}
+			tempPath := tempFile.Name()
+			defer os.Remove(tempPath)
+
+			_, err = io.Copy(tempFile, object)
+			tempFile.Close()
+			if err != nil {
+				utils.DeleteFromMinIO(filename)
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "server_error",
+					"message": "Failed to process file",
+					"details": err.Error(),
+				})
+			}
+
+			// Get page count
+			pageCount = npdfpages.PagesAtPath(tempPath)
+			if pageCount <= 0 {
+				utils.DeleteFromMinIO(filename)
+				return c.Status(400).JSON(fiber.Map{
+					"error":   "invalid_file",
+					"message": "Invalid PDF file or unable to read page count",
+				})
+			}
+		} else {
+			// Fallback to local storage
+			fmt.Println("MinIO not available, using local storage")
+
+			if err := os.MkdirAll("./uploads", os.ModePerm); err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "server_error",
+					"message": "Failed to create upload directory",
+					"details": err.Error(),
+				})
+			}
+
+			if err := c.SaveFile(file, "./uploads/"+filename); err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "server_error",
+					"message": "Failed to save file",
+					"details": err.Error(),
+				})
+			}
+
+			// Get page count
+			pageCount = npdfpages.PagesAtPath(filepath.Join("uploads", filename))
+			if pageCount <= 0 {
+				os.Remove(filepath.Join("uploads", filename))
+				return c.Status(400).JSON(fiber.Map{
+					"error":   "invalid_file",
+					"message": "Invalid PDF file or unable to read page count",
+				})
+			}
 		}
 
 		pdf := models.PDF{
@@ -450,7 +568,11 @@ func main() {
 
 		if err := db.Create(&pdf).Error; err != nil {
 			// Clean up the uploaded file if database save fails
-			os.Remove(filepath.Join("uploads", filename))
+			if utils.IsMinIOAvailable() {
+				utils.DeleteFromMinIO(filename)
+			} else {
+				os.Remove(filepath.Join("uploads", filename))
+			}
 			return c.Status(500).JSON(fiber.Map{
 				"error":   "database_error",
 				"message": "Failed to create PDF record",
@@ -505,19 +627,38 @@ func main() {
 			})
 		}
 
-		filePath := filepath.Join("uploads", pdf.Filename)
-		file, err := os.Open(filePath)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "file_error",
-				"message": "Failed to open PDF file",
-				"details": err.Error(),
-			})
-		}
-		defer file.Close()
-
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
+
+		var fileReader io.Reader
+
+		// Check if MinIO is available
+		if utils.IsMinIOAvailable() {
+			// Download from MinIO
+			object, err := utils.DownloadFromMinIO(pdf.Filename)
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "storage_error",
+					"message": "Failed to retrieve PDF from storage",
+					"details": err.Error(),
+				})
+			}
+			defer object.Close()
+			fileReader = object
+		} else {
+			// Read from local storage
+			filePath := filepath.Join("uploads", pdf.Filename)
+			file, err := os.Open(filePath)
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":   "file_error",
+					"message": "Failed to open PDF file",
+					"details": err.Error(),
+				})
+			}
+			defer file.Close()
+			fileReader = file
+		}
 
 		filePart, err := writer.CreateFormFile("file", pdf.Filename)
 		if err != nil {
@@ -527,7 +668,7 @@ func main() {
 				"details": err.Error(),
 			})
 		}
-		io.Copy(filePart, file)
+		io.Copy(filePart, fileReader)
 
 		writer.WriteField("style", req.Style)
 		writer.WriteField("language", req.Language)
@@ -866,6 +1007,127 @@ func main() {
 				"details": err.Error(),
 			})
 		}
+
+		return c.Status(200).JSON(stats)
+	})
+
+	// Log endpoints
+	app.Get("/logs", func(c *fiber.Ctx) error {
+		var logs []models.Log
+
+		// Pagination parameters
+		page := c.QueryInt("page", 1)
+		itemsPerPage := c.QueryInt("itemsperpage", 50)
+
+		if page < 1 {
+			page = 1
+		}
+		if itemsPerPage < 1 || itemsPerPage > 200 {
+			itemsPerPage = 50
+		}
+
+		offset := (page - 1) * itemsPerPage
+		limit := itemsPerPage
+
+		// Filters
+		method := c.Query("method", "")
+		path := c.Query("path", "")
+		statusCode := c.QueryInt("status", 0)
+		minDuration := c.QueryInt("min_duration", 0)
+
+		query := db.Model(&models.Log{})
+
+		if method != "" {
+			query = query.Where("method = ?", method)
+		}
+		if path != "" {
+			query = query.Where("path ILIKE ?", "%"+path+"%")
+		}
+		if statusCode != 0 {
+			query = query.Where("status_code = ?", statusCode)
+		}
+		if minDuration > 0 {
+			query = query.Where("duration >= ?", minDuration)
+		}
+
+		// Get total count
+		var totalCount int64
+		if err := query.Count(&totalCount).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "database_error",
+				"message": "Failed to count logs",
+			})
+		}
+
+		totalPages := int((totalCount + int64(itemsPerPage) - 1) / int64(itemsPerPage))
+
+		if err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "database_error",
+				"message": "Failed to fetch logs",
+			})
+		}
+
+		return c.Status(200).JSON(fiber.Map{
+			"data":           logs,
+			"page":           page,
+			"items_per_page": itemsPerPage,
+			"total_pages":    totalPages,
+			"total_items":    totalCount,
+		})
+	})
+
+	app.Get("/logs/stats", func(c *fiber.Ctx) error {
+		var stats struct {
+			TotalRequests    int64            `json:"total_requests"`
+			AvgDuration      float64          `json:"avg_duration_ms"`
+			ByStatusCode     map[string]int64 `json:"by_status_code"`
+			ByMethod         map[string]int64 `json:"by_method"`
+			SlowestEndpoints []struct {
+				Path        string  `json:"path"`
+				AvgDuration float64 `json:"avg_duration_ms"`
+			} `json:"slowest_endpoints"`
+		}
+
+		// Total requests
+		db.Model(&models.Log{}).Count(&stats.TotalRequests)
+
+		// Average duration
+		var avgDuration sql.NullFloat64
+		db.Model(&models.Log{}).Select("AVG(duration)").Scan(&avgDuration)
+		if avgDuration.Valid {
+			stats.AvgDuration = avgDuration.Float64
+		}
+
+		// By status code
+		var statusCounts []struct {
+			StatusCode int   `json:"status_code"`
+			Count      int64 `json:"count"`
+		}
+		db.Model(&models.Log{}).Select("status_code, COUNT(*) as count").Group("status_code").Find(&statusCounts)
+		stats.ByStatusCode = make(map[string]int64)
+		for _, sc := range statusCounts {
+			stats.ByStatusCode[fmt.Sprintf("%d", sc.StatusCode)] = sc.Count
+		}
+
+		// By method
+		var methodCounts []struct {
+			Method string `json:"method"`
+			Count  int64  `json:"count"`
+		}
+		db.Model(&models.Log{}).Select("method, COUNT(*) as count").Group("method").Find(&methodCounts)
+		stats.ByMethod = make(map[string]int64)
+		for _, mc := range methodCounts {
+			stats.ByMethod[mc.Method] = mc.Count
+		}
+
+		// Slowest endpoints
+		db.Model(&models.Log{}).
+			Select("path, AVG(duration) as avg_duration").
+			Group("path").
+			Order("avg_duration DESC").
+			Limit(10).
+			Find(&stats.SlowestEndpoints)
 
 		return c.Status(200).JSON(stats)
 	})

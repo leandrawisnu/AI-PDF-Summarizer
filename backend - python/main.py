@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pathlib import Path
@@ -10,6 +10,7 @@ import PyPDF2
 import re
 import os
 import time
+from simple_logger import SimpleLogger
 
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
@@ -48,6 +49,38 @@ app.add_middleware(
     allow_methods=["POST", "GET", "OPTIONS"],  
     allow_headers=["Content-Type", "Authorization"],  
 )
+
+# Simple logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start_time) * 1000
+        
+        SimpleLogger.log_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            ip_address=request.client.host if request.client else "unknown"
+        )
+        
+        return response
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        
+        SimpleLogger.log_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=500,
+            duration_ms=duration_ms,
+            ip_address=request.client.host if request.client else "unknown",
+            error=str(e)
+        )
+        
+        raise
 
 # Configure the Gemini API
 # You'll need to set your API key in environment variables

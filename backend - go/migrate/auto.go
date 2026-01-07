@@ -26,6 +26,7 @@ func main() {
 	if err := db.AutoMigrate(
 		&models.PDF{},
 		&models.Summaries{},
+		&models.Log{},
 	); err != nil {
 		panic("Migration failed: " + err.Error())
 	}

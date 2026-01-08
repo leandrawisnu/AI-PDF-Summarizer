@@ -4,12 +4,15 @@ from fastapi.responses import JSONResponse
 from pathlib import Path
 from dotenv import load_dotenv
 from enum import Enum
+from pydantic import BaseModel
+from typing import List, Optional
 import google.generativeai as genai
 import io
 import PyPDF2
 import re
 import os
 import time
+import requests
 from simple_logger import SimpleLogger
 
 load_dotenv()
@@ -20,6 +23,11 @@ if api_key:
     genai.configure(api_key=api_key)
 else:
     print("Warning: GEMINI_API_KEY not found in environment variables")
+
+# Custom Embedding API configuration
+EMBEDDING_API_URL = "https://statelystatic-siprakerin-embedding.hf.space/embed"
+print(f"✓ Using custom embedding API: {EMBEDDING_API_URL}")
+print("✓ Embedding dimensions: 1024")
 
 
 # Enum for summary style
@@ -33,6 +41,19 @@ class Language(str, Enum):
     IND = "indonesian"
     ENG = "english"
 
+# Pydantic models for chat
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ChatMessage]] = []
+    context: Optional[str] = None  # RAG context from summaries
+
+class EmbeddingRequest(BaseModel):
+    text: str
+
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -44,7 +65,7 @@ app = FastAPI(
 # Add CORS middleware to allow frontend connections
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"], 
+    allow_origins=["http://localhost:8080", "http://localhost:3000"], 
     allow_credentials=True,
     allow_methods=["POST", "GET", "OPTIONS"],  
     allow_headers=["Content-Type", "Authorization"],  
@@ -105,6 +126,169 @@ async def health_check():
         "service": "PDF AI Summarizer API",
         "version": "1.0.0"
     }
+
+@app.post("/embedding")
+async def generate_text_embedding(request: EmbeddingRequest):
+    """
+    Generate embedding vector from text using custom embedding API
+    
+    Args:
+        request: EmbeddingRequest containing text to embed
+        
+    Returns:
+        JSON response with embedding vector
+    """
+    try:
+        start_time = time.time()
+        
+        # Call custom embedding API
+        response = requests.post(
+            EMBEDDING_API_URL,
+            json={"text": request.text},
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Embedding API error: {response.text}"
+            )
+        
+        result = response.json()
+        embedding_list = result.get("embedding", [])
+        
+        if not embedding_list:
+            raise HTTPException(
+                status_code=500,
+                detail="No embedding returned from API"
+            )
+        
+        # Calculate processing time
+        processing_time = round(time.time() - start_time, 2)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "embedding": embedding_list,
+                "dimensions": len(embedding_list),
+                "processing_time": processing_time,
+                "model": "custom-embedding-api",
+                "status": "success"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"Embedding endpoint error: {error_detail}")
+        
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating embedding: {str(e)}"
+        )
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    """
+    Chat endpoint for conversing with Gemini AI with RAG support
+    
+    Args:
+        request: ChatRequest containing message, optional conversation history, and optional context
+        
+    Returns:
+        JSON response with AI reply
+    """
+    try:
+        start_time = time.time()
+        
+        # Check if API key is configured
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="GEMINI_API_KEY not configured. Please set the API key in environment variables."
+            )
+        
+        # Initialize Gemini model (using same model as summarize for consistency)
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        
+        # Build conversation history for context
+        chat_history = []
+        for msg in request.history:
+            chat_history.append({
+                "role": msg.role,
+                "parts": [msg.content]
+            })
+        
+        # Prepare the user message with RAG context if available
+        user_message = request.message
+        if request.context:
+            user_message = f"""You are an AI assistant helping users understand their PDF documents.
+
+            Context from relevant document summary:
+            {request.context}
+
+            User question: {user_message}
+
+            Instructions:
+            - Answer the user's question based on the provided context from the document summary
+            - If the context doesn't contain enough information to answer, say so clearly
+            - Be concise and helpful
+            - Cite information from the context when relevant
+            """
+        
+        print(f"DEBUG - user_message: {user_message}")
+        print(f"DEBUG - has context: {bool(request.context)}")
+            
+        # Add current user message
+        chat_history.append({
+            "role": "user",
+            "parts": [user_message]
+        })
+        
+        # Start chat session with history
+        chat = model.start_chat(history=chat_history[:-1])  # Exclude last message as we'll send it
+        
+        # Send message and get response
+        response = chat.send_message(
+            user_message,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.7,
+                top_k=40,
+                top_p=0.95,
+                max_output_tokens=2048,
+            )
+        )
+        
+        # Calculate processing time
+        processing_time = round(time.time() - start_time, 2)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "reply": response.text,
+                "processing_time": processing_time,
+                "status": "success"
+            }
+        )
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"Chat endpoint error: {error_detail}")
+        
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing chat request: {str(e)}"
+        )
 
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text content from PDF file"""
@@ -326,6 +510,50 @@ def summarize_chunks(chunks: list, style: str, language: str) -> str:
     except Exception as e:
         return f"Error creating final summary: {str(e)}\n\nSection summaries:\n{combined_text}"
 
+def generate_embedding(text: str, max_retries: int = 3) -> list:
+    """
+    Generate embedding vector from text using custom embedding API
+    
+    Args:
+        text: Text to generate embedding for
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        List of floats representing the embedding vector
+    """
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                EMBEDDING_API_URL,
+                json={"text": text},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                embedding = result.get("embedding", [])
+                if embedding:
+                    return embedding
+                else:
+                    print("Warning: Empty embedding returned")
+                    return []
+            else:
+                print(f"Embedding API error: {response.status_code} - {response.text}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                return []
+                
+        except Exception as e:
+            print(f"Error generating embedding (attempt {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            return []
+    
+    return []
+
+
 def summarize_single_chunk(text: str, style: str, language: str) -> str:
     """
     Summarize a single chunk of text
@@ -444,6 +672,14 @@ async def summarize_pdf(file: UploadFile = File(...), style: Style = Form(...), 
         end_time = time.time()
         processing_time = round(end_time - start_time, 2)
         
+        # Generate embedding vector from the summary
+        embedding_vector = generate_embedding(ai_summary)
+        
+        if embedding_vector:
+            print(f"✓ Generated embedding with {len(embedding_vector)} dimensions")
+        else:
+            print("Warning: Failed to generate embedding vector")
+        
         mock_summary = {
             "title": Path(file.filename).stem,
             "summary": {
@@ -451,6 +687,7 @@ async def summarize_pdf(file: UploadFile = File(...), style: Style = Form(...), 
                 "word_count": word_stats["total_words"],
                 "reading_time": reading_time,
             },
+            "embedding": embedding_vector,
             "language": language,
             "style": style,
             "file_info": {
@@ -462,7 +699,8 @@ async def summarize_pdf(file: UploadFile = File(...), style: Style = Form(...), 
             "processing_info": {
                 "chunks_processed": len(chunks),
                 "chunking_used": len(chunks) > 1,
-                "processing_time_seconds": processing_time
+                "processing_time_seconds": processing_time,
+                "embedding_dimensions": len(embedding_vector)
             },
             "status": "completed"
         }

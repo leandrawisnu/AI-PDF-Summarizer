@@ -1,5 +1,6 @@
 // API configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL_GO || 'http://localhost:8080';
+const PYTHON_API_URL = process.env.NEXT_PUBLIC_API_URL_PYTHON || 'http://localhost:8000';
 
 // Helper function to handle API responses
 async function handleResponse(response) {
@@ -21,7 +22,7 @@ export const pdfApi = {
       order: params.order || 'desc',
       ...(params.search && { search: params.search })
     });
-
+    
     const response = await fetch(`${API_BASE_URL}/pdf?${searchParams}`);
     return handleResponse(response);
   },
@@ -173,6 +174,27 @@ export const healthApi = {
 
   async health() {
     const response = await fetch(`${API_BASE_URL}/health`);
+    return handleResponse(response);
+  },
+};
+
+// Chat API functions (via Go backend proxy to Python)
+export const chatApi = {
+  async sendMessage(message, history = [], pdfIds = []) {
+    const response = await fetch(`${API_BASE_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        history: history.map(msg => ({
+          role: msg.type === 'user' ? 'user' : 'model',
+          content: msg.content
+        })),
+        pdf_ids: pdfIds
+      }),
+    });
     return handleResponse(response);
   },
 };

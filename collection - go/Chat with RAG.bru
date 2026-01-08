@@ -1,0 +1,61 @@
+meta {
+  name: Chat with RAG
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "What are the main topics discussed in these documents?",
+    "history": [],
+    "pdf_ids": [2]
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+}
+
+docs {
+  # Chat with RAG (Retrieval Augmented Generation)
+  
+  This endpoint demonstrates the NotebookLM-like feature where you can chat with your PDF documents.
+  
+  ## How it works:
+  
+  1. **Frontend**: User selects PDFs and asks a question
+  2. **Go Backend**: 
+     - Receives the question and array of PDF IDs
+     - Generates an embedding for the user's question using Gemini
+     - Searches for the most similar summary from the selected PDFs using pgvector cosine similarity
+     - Sends the most relevant summary as context to Python backend
+  3. **Python Backend**: 
+     - Receives the question and context
+     - Uses the context to provide accurate, document-based answers
+  
+  ## Request Body:
+  
+  - `message`: The user's question
+  - `history`: Conversation history (optional)
+  - `pdf_ids`: Array of PDF IDs to search for relevant context
+  
+  ## Example Usage:
+  
+  1. First, upload some PDFs and generate summaries
+  2. Note the PDF IDs
+  3. Use those IDs in the `pdf_ids` array
+  4. Ask questions about the documents
+  
+  ## Notes:
+  
+  - The system uses cosine similarity to find the most relevant summary
+  - Only summaries from the specified PDFs are considered
+  - The most relevant summary is used as context for the AI
+  - This enables accurate, document-based responses
+}

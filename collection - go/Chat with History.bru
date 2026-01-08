@@ -1,0 +1,32 @@
+meta {
+  name: Chat with History
+  type: http
+  seq: 10
+}
+
+post {
+  url: http://127.0.0.1:8080/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "What did I just ask you about?",
+    "history": [
+      {
+        "role": "user",
+        "content": "Hello! Can you help me understand PDF documents?"
+      },
+      {
+        "role": "model",
+        "content": "Hello! Yes, I'd be happy to help you understand PDF documents. I can assist with various aspects of PDFs, such as explaining their content, summarizing information, answering questions about specific sections, and more. What would you like to know about PDF documents?"
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

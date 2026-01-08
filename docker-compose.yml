@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Database (Optional - can be removed if using external PostgreSQL)
   postgres:
-    image: postgres:latest
+    image: pgvector/pgvector:pg17
     container_name: postgres_ai_pdf
     environment:
       POSTGRES_USER: postgres
@@ -45,7 +45,7 @@ services:
       - "8080:8080"
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/ai_pdf_management?sslmode=disable
-      - PYTHON_API_URL=python_backend:8000
+      - PYTHON_API_URL=http://backend-python:8000
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin

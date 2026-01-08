@@ -1,0 +1,28 @@
+meta {
+  name: Chat with RAG (Updated)
+  type: http
+  seq: 8
+}
+
+post {
+  url: http://localhost:8080/chat
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "message": "What are the main topics covered in the documents?",
+    "pdf_ids": [1, 2],
+    "history": [
+      {
+        "role": "user",
+        "content": "Hello"
+      },
+      {
+        "role": "assistant", 
+        "content": "Hello! How can I help you with your documents today?"
+      }
+    ]
+  }
+}

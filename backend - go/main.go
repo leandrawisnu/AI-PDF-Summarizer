@@ -19,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/uuid"
+	"github.com/pgvector/pgvector-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -676,12 +677,12 @@ func main() {
 
 		pythonAPIURL := os.Getenv("PYTHON_API_URL")
 		if pythonAPIURL == "" {
-			pythonAPIURL = "127.0.0.1:8000"
+			pythonAPIURL = "http://127.0.0.1:8000"
 		}
 
 		httpReq, _ := http.NewRequest(
 			"POST",
-			fmt.Sprintf("http://%s/summarize", pythonAPIURL),
+			fmt.Sprintf("%s/summarize", pythonAPIURL),
 			body,
 		)
 		httpReq.Header.Set("Content-Type", writer.FormDataContentType())
@@ -725,9 +726,19 @@ func main() {
 			SummaryTime: pythonResponse.ProcessInfo.ProcessingTimeSeconds,
 		}
 
+		// Only set embedding if it's not empty
+		if len(pythonResponse.Embedding) > 0 {
+			summary.Embedding = pgvector.NewVector(pythonResponse.Embedding)
+			fmt.Printf("✓ Embedding saved with %d dimensions\n", len(pythonResponse.Embedding))
+		} else {
+			fmt.Println("Warning: No embedding generated for summary")
+		}
+
 		if err := db.Create(&summary).Error; err != nil {
 			fmt.Printf("Failed to save summary: %v\n", err)
 			// Don't return error here as the summary was generated successfully
+		} else {
+			fmt.Printf("✓ Summary saved successfully (ID: %d)\n", summary.ID)
 		}
 
 		return c.Status(200).JSON(pythonResponse)
@@ -1130,6 +1141,155 @@ func main() {
 			Find(&stats.SlowestEndpoints)
 
 		return c.Status(200).JSON(stats)
+	})
+
+	// Chat endpoint - proxy to Python backend with RAG
+	app.Post("/chat", func(c *fiber.Ctx) error {
+		var req dto.ChatRequest
+
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid request body",
+			})
+		}
+
+		var ragContext string
+
+		// If PDF IDs are provided, find the most relevant summary
+		if len(req.PDFIDs) > 0 {
+			fmt.Printf("DEBUG: Processing RAG for %d PDF IDs: %v\n", len(req.PDFIDs), req.PDFIDs)
+
+			// Get Python API URL from environment
+			pythonAPIURL := os.Getenv("PYTHON_API_URL")
+			if pythonAPIURL == "" {
+				pythonAPIURL = "http://127.0.0.1:8000"
+			}
+
+			// Generate embedding for user's message using Python backend
+			embeddingReq := map[string]interface{}{
+				"text": req.Message,
+			}
+
+			jsonData, err := json.Marshal(embeddingReq)
+			if err != nil {
+				fmt.Printf("Warning: Failed to prepare embedding request: %v\n", err)
+			} else {
+				fmt.Printf("DEBUG: Calling embedding service at %s/embedding\n", pythonAPIURL)
+				resp, err := http.Post(
+					pythonAPIURL+"/embedding",
+					"application/json",
+					bytes.NewBuffer(jsonData),
+				)
+				if err != nil {
+					fmt.Printf("Warning: Failed to connect to embedding service: %v\n", err)
+				} else {
+					defer resp.Body.Close()
+
+					if resp.StatusCode == 200 {
+						body, err := io.ReadAll(resp.Body)
+						if err != nil {
+							fmt.Printf("Warning: Failed to read embedding response: %v\n", err)
+						} else {
+							var embeddingResp map[string]interface{}
+							if err := json.Unmarshal(body, &embeddingResp); err != nil {
+								fmt.Printf("Warning: Failed to parse embedding response: %v\n", err)
+							} else if embedding, ok := embeddingResp["embedding"].([]interface{}); ok {
+								fmt.Printf("DEBUG: Received embedding with %d dimensions\n", len(embedding))
+
+								// Convert interface{} slice to float32 slice (pgvector requires float32)
+								embeddingValues := make([]float32, len(embedding))
+								for i, v := range embedding {
+									if f, ok := v.(float64); ok {
+										embeddingValues[i] = float32(f)
+									}
+								}
+
+								// Convert embedding to pgvector format
+								queryEmbedding := pgvector.NewVector(embeddingValues)
+								fmt.Printf("DEBUG: Searching for similar summaries in PDFs: %v\n", req.PDFIDs)
+
+								// Find the most similar summary from the selected PDFs
+								var bestSummary models.Summaries
+								err := db.Model(&models.Summaries{}).
+									Where("pdf_id IN ? AND embedding IS NOT NULL", req.PDFIDs).
+									Order(fmt.Sprintf("embedding <=> '%s'", queryEmbedding.String())).
+									Limit(1).
+									First(&bestSummary).Error
+
+								if err == nil {
+									ragContext = bestSummary.Content
+									fmt.Printf("✓ Found relevant summary (ID: %d, PDF ID: %d) for chat context\n", bestSummary.ID, bestSummary.PDFID)
+									fmt.Printf("DEBUG: Context length: %d characters\n", len(ragContext))
+								} else if err != gorm.ErrRecordNotFound {
+									fmt.Printf("Warning: Failed to find similar summary: %v\n", err)
+								} else {
+									fmt.Printf("Warning: No summaries found with embeddings for PDF IDs: %v\n", req.PDFIDs)
+								}
+							} else {
+								fmt.Printf("Warning: Failed to extract embedding from response\n")
+							}
+						}
+					} else if resp.StatusCode == 429 {
+						// Rate limit error
+						bodyBytes, _ := io.ReadAll(resp.Body)
+						fmt.Printf("⚠️  Rate limit exceeded: %s\n", string(bodyBytes))
+						fmt.Println("Tip: Wait a minute before trying again, or consider upgrading your Gemini API quota")
+					} else {
+						bodyBytes, _ := io.ReadAll(resp.Body)
+						fmt.Printf("Warning: Embedding service returned status %d: %s\n", resp.StatusCode, string(bodyBytes))
+					}
+				}
+			}
+		}
+
+		// Get Python API URL from environment
+		pythonAPIURL := os.Getenv("PYTHON_API_URL")
+		if pythonAPIURL == "" {
+			pythonAPIURL = "http://127.0.0.1:8000"
+		}
+
+		// Prepare request with context
+		chatReq := map[string]interface{}{
+			"message": req.Message,
+			"history": req.History,
+		}
+		if ragContext != "" {
+			chatReq["context"] = ragContext
+		}
+
+		// Marshal request to JSON
+		jsonData, err := json.Marshal(chatReq)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Failed to prepare request",
+			})
+		}
+
+		// Forward request to Python backend
+		resp, err := http.Post(
+			pythonAPIURL+"/chat",
+			"application/json",
+			bytes.NewBuffer(jsonData),
+		)
+		if err != nil {
+			return c.Status(503).JSON(fiber.Map{
+				"error": "Failed to connect to AI service",
+			})
+		}
+		defer resp.Body.Close()
+
+		// Read response
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Failed to read AI response",
+			})
+		}
+
+		// Forward response status and body
+		c.Status(resp.StatusCode)
+		c.Set("Content-Type", "application/json")
+		return c.Send(body)
 	})
 
 	app.Listen("0.0.0.0:8080")

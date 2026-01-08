@@ -48,6 +48,7 @@ type SummaryListResponse struct {
 type PythonSummaryResponse struct {
 	Title       string                 `json:"title"`
 	Summary     SummaryDetails         `json:"summary"`
+	Embedding   []float32              `json:"embedding"`
 	Language    string                 `json:"language"`
 	Style       string                 `json:"style"`
 	FileInfo    FileInfo               `json:"file_info"`
@@ -72,6 +73,7 @@ type ProcessingInfo struct {
 	ChunksProcessed       int     `json:"chunks_processed"`
 	ChunkingUsed          bool    `json:"chunking_used"`
 	ProcessingTimeSeconds float64 `json:"processing_time_seconds"`
+	EmbeddingDimensions   int     `json:"embedding_dimensions"`
 }
 
 type BulkDeleteRequest struct {

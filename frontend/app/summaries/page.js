@@ -207,6 +207,7 @@ export default function SummariesPage() {
                             <a href="/" className="text-[#D1D5DB] hover:text-white transition-colors font-normal">Home</a>
                             <a href="/documents" className="text-[#D1D5DB] hover:text-white transition-colors font-normal">Documents</a>
                             <a href="/summaries" className="text-[#3B82F6] font-normal">Summaries</a>
+                            <a href="/study" className="text-[#D1D5DB] hover:text-white transition-colors font-normal">Study</a>
                         </nav>
                     </div>
                 </div>

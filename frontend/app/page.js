@@ -85,9 +85,9 @@ export default function HomePage() {
       description: "Support for Indonesian and English summaries with style options"
     },
     {
-      icon: <Search className="w-6 h-6 stroke-1.5" />,
-      title: "Smart Search",
-      description: "Find documents and summaries quickly with advanced search capabilities"
+      icon: <FileText className="w-6 h-6 stroke-1.5" />,
+      title: "Study Assistant",
+      description: "Chat with your PDFs using AI-powered study sessions"
     }
   ];
 
@@ -112,6 +112,7 @@ export default function HomePage() {
             <nav className="hidden md:flex items-center gap-6">
               <a href="/documents" className="text-[#D1D5DB] hover:text-white transition-colors font-normal">Documents</a>
               <a href="/summaries" className="text-[#D1D5DB] hover:text-white transition-colors font-normal">Summaries</a>
+              <a href="/study" className="text-[#D1D5DB] hover:text-white transition-colors font-normal">Study</a>
             </nav>
           </div>
         </div>
@@ -262,7 +263,7 @@ export default function HomePage() {
         {/* Quick Actions */}
         <div className="mt-8">
           <h3 className="text-2xl font-medium text-white mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <a 
               href="/documents"
               className="border border-[#1F2937] rounded-lg p-6 hover:border-[#3B82F6] hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all duration-200 text-left group block"
@@ -279,6 +280,15 @@ export default function HomePage() {
               <FileCheck className="w-8 h-8 text-[#10B981] stroke-1.5 mb-3 group-hover:scale-110 transition-transform" />
               <h4 className="text-white font-medium mb-2">View Summaries</h4>
               <p className="text-[#D1D5DB] text-sm font-normal">Browse and manage your AI-generated summaries</p>
+            </a>
+
+            <a 
+              href="/study"
+              className="border border-[#1F2937] rounded-lg p-6 hover:border-[#F59E0B] hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)] transition-all duration-200 text-left group block"
+            >
+              <Sparkles className="w-8 h-8 text-[#F59E0B] stroke-1.5 mb-3 group-hover:scale-110 transition-transform" />
+              <h4 className="text-white font-medium mb-2">Study Assistant</h4>
+              <p className="text-[#D1D5DB] text-sm font-normal">Chat with your PDFs using AI-powered insights</p>
             </a>
           </div>
         </div>

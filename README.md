@@ -17,6 +17,14 @@ This project consists of four main components:
 - **PDF Upload & Management**: Upload, store, and manage PDF documents
 - **MinIO Object Storage**: S3-compatible storage for scalable file management
 - **AI Summarization**: Generate summaries using Google Gemini AI with multiple styles and languages
+- **AI Chat Assistant**: Interactive chat with Gemini AI for document understanding and Q&A
+- **Study Mode (NotebookLM-like)**: 
+  - Select multiple PDFs as sources
+  - Ask questions and get AI-powered answers based on your documents
+  - Interactive chat interface with document context
+  - Perfect for research, studying, and document analysis
+- **RAG (Retrieval Augmented Generation)**: Chat with your PDFs using AI-powered context retrieval
+- **Vector Similarity Search**: Find relevant document summaries using pgvector and embeddings
 - **Multi-language Support**: Indonesian and English summarization
 - **Summary Styles**: Short, General, and Detailed summaries
 - **RESTful API**: Clean API design with proper DTOs and validation
@@ -62,6 +70,7 @@ AI PDF Management/
 
 ### Database
 - **PostgreSQL 15**: Primary database
+- **pgvector**: Vector similarity search extension
 - **MinIO**: S3-compatible object storage
 - **Adminer**: Database administration tool
 
@@ -223,7 +232,111 @@ type Summaries struct {
     PDFID       uint
     Language    string
     SummaryTime float64
+    Embedding   pgvector.Vector `gorm:"type:vector(1024)"`
 }
+```
+
+## 🎓 Pages & Features
+
+### Home Page (`/`)
+- Overview of the application
+- Quick access to main features
+- Statistics dashboard
+
+### Documents Page (`/documents`)
+- Browse all uploaded PDFs
+- Upload new documents
+- View document details
+- Delete documents
+
+### Summaries Page (`/summaries`)
+- View all generated summaries
+- Filter by style and language
+- Search summaries
+- Generate new summaries
+
+### Study Page (`/study`) - NotebookLM-like
+- **Interactive Learning Environment**
+- Add multiple PDFs as sources
+- Chat with AI about your documents
+- Get contextual answers based on selected PDFs
+- Real-time conversation with message history
+- Perfect for research and studying
+
+## 🤖 Study Mode - NotebookLM-like Experience
+
+The Study page provides an interactive learning environment where you can chat with multiple PDF documents simultaneously, similar to Google's NotebookLM.
+
+### Features
+
+- **Multi-Document Sources**: Add multiple PDFs as reference sources
+- **Interactive Chat**: Ask questions and get AI-powered answers based on your documents
+- **Context-Aware Responses**: AI retrieves relevant information from your selected PDFs
+- **Real-time Conversation**: Smooth chat interface with message history
+- **Document Management**: Easily add or remove source documents during your study session
+
+### How to Use
+
+1. **Navigate to Study Page**: Go to `/study` in the application
+2. **Add Documents**: Click "Add Document" to select PDFs from your library
+3. **Ask Questions**: Type your questions in the chat input
+4. **Get AI Answers**: Receive contextual answers based on your selected documents
+
+### Example Workflow
+
+```
+1. Upload PDFs about Machine Learning
+2. Go to Study page
+3. Add those PDFs as sources
+4. Ask: "What are the main differences between supervised and unsupervised learning?"
+5. Get AI-powered answer based on your documents
+```
+
+### Technical Implementation
+
+- **Frontend**: React-based chat interface with real-time updates
+- **Backend**: RAG (Retrieval Augmented Generation) system
+- **Embedding Search**: Vector similarity to find relevant content
+- **AI Response**: Gemini AI generates answers using document context
+
+## 🤖 RAG Feature (Retrieval Augmented Generation)
+
+This application includes a powerful RAG system that powers the Study mode and enables intelligent document-based conversations.
+
+### How it Works
+
+1. **Document Selection**: Choose one or more PDF documents
+2. **Question Processing**: Your question is converted to an embedding vector
+3. **Context Retrieval**: System finds the most relevant summary using vector similarity search
+4. **AI Response**: Gemini AI answers based on the retrieved document context
+
+### Technical Implementation
+
+- **Embedding Generation**: Custom embedding API (1024 dimensions)
+- **Vector Search**: pgvector extension with cosine similarity (`<=>` operator)
+- **Context Retrieval**: Finds the most relevant summary from selected PDFs
+- **AI Response**: Gemini 2.5 Flash Lite generates contextual answers
+
+For detailed information, see [RAG_FEATURE.md](RAG_FEATURE.md) and [CUSTOM_EMBEDDING_API.md](CUSTOM_EMBEDDING_API.md)
+
+### Example Usage
+
+#### Study Mode (Web Interface)
+1. Navigate to http://localhost:3000/study
+2. Click "Add Document" to select PDFs
+3. Type your question in the chat
+4. Get AI-powered answers based on your documents
+
+#### Chat API (Programmatic)
+```bash
+# Chat with documents
+curl -X POST http://localhost:8080/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What are the main topics in these documents?",
+    "history": [],
+    "pdf_ids": [1, 2, 3]
+  }'
 ```
 
 ## 🎯 API Usage Examples

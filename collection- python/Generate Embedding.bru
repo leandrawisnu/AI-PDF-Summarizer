@@ -1,0 +1,17 @@
+meta {
+  name: Generate Embedding
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:8000/embedding
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "text": "What is machine learning and how does it work?"
+  }
+}

@@ -22,6 +22,13 @@ func main() {
 	println("Connected to database successfully!")
 	println("Running AutoMigrate...")
 
+	// Enable pgvector extension
+	if err := db.Exec("CREATE EXTENSION IF NOT EXISTS vector").Error; err != nil {
+		println("Warning: Could not create vector extension: " + err.Error())
+	} else {
+		println("pgvector extension enabled successfully!")
+	}
+
 	// Migrate models in correct order (parent first, then child)
 	if err := db.AutoMigrate(
 		&models.PDF{},

@@ -260,7 +260,6 @@ type Summaries struct {
 - Add multiple PDFs as sources
 - Chat with AI about your documents
 - Get contextual answers based on selected PDFs
-- Real-time conversation with message history
 - Perfect for research and studying
 
 ## 🤖 Study Mode - NotebookLM-like Experience
